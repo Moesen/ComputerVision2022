@@ -1,10 +1,15 @@
 import numpy as np
 import matplotlib as plt
 from scipy.interpolate import RegularGridInterpolator
+from scipy import optimize
 from PIL import Image
 
 
-def projectpoints(K: np.array, R: np.array, t: np.array, Q: np.array) -> np.array:
+def make_projection_matrix(K, R, t):
+    return K @ np.append(R, t.reshape(-1, 1), axis=1)
+
+
+def projectpoints(K: np.array, R: np.array, t: np.array, Q: np.array, return_hom = False) -> np.array:
     """Projects points given a camera-, rotation and translation matrix
     on points Q
 
@@ -21,9 +26,16 @@ def projectpoints(K: np.array, R: np.array, t: np.array, Q: np.array) -> np.arra
     Rt = np.append(R, t, axis=1)
     P = K @ Rt
 
+    # Checking if Q is 1-D vector
+    if len(Q.shape) == 1:
+        Q = Q.reshape(-1, 1)
     Qh = np.append(Q, np.ones((1, Q.shape[1])), axis=0)
 
-    return P @ Qh
+    return_Q = P @ Qh
+    if not return_hom:
+        return_Q = hom_to_inhom(return_Q)
+        
+    return return_Q
 
 
 def hom_to_inhom(Q: np.array) -> np.array:
@@ -87,7 +99,7 @@ def distort_image(
     # Power to the distances
     powers = np.arange(2, len(dist_coffs) * 2 + 1, step=2).reshape(-1, 1)
     # Distances to the increasing power according to formular
-    power_dists = distances**powers.T
+    power_dists = distances ** powers.T
     # Coefficients times the distances to the powers
     coff_dists = dist_coffs * power_dists
     # Sums of the distances
@@ -133,4 +145,60 @@ def generate_fundemental_matrix(k1: np.array, k2: np.array, r: np.array, t: np.a
     fundemental_matrix = np.linalg.inv(k2.T) @ essential_matrix @ np.linalg.inv(k1)
     return essential_matrix, fundemental_matrix
 
-/
+def triangulate(qs: np.array, ps: np.array, return_hom = False) -> np.array:
+    """Finds a point given pixel coordinates q, and their respective projection matrix p
+
+    Args:
+        qs (np.array): inhomogenous pixel coordinates in 2xN shape
+        ps (np.array): projection matrices, in 3xN shape
+
+    Returns:
+        np.array: _description_
+    """
+    # We check whether the shape is alright
+    assert (len(qs.shape) == 1 or qs.shape[1] == 1)
+    assert ps.shape[0] % 3 == 0
+    
+    left_side = np.repeat(ps[2::3], 2, axis=0)
+    right_side = np.delete(ps, list(range(2, ps.shape[0], 3)), axis=0)
+    
+    B = left_side * qs - right_side
+    A = B.T @ B
+    _, _, vh = np.linalg.svd(A)
+    ret = vh[-1, :]
+    if not return_hom:
+        ret = hom_to_inhom(ret)
+    return ret
+
+def triangulate_nonlin(qs: np.array, ps: np.array) -> np.array:
+    
+    """Nonlinear triangulation using least squares method
+
+    Args:
+        qs (np.array): N*2X1 vector
+        ps (np.array): Projection matrices in 4x3*N shape
+
+    Returns:
+        np.array: Closest approximation for point
+    """
+    
+    assert ps.shape[0] % 3 == 0
+    
+    if len(qs.shape) > 1:
+        qs = qs.reshape(-1)
+        
+    # Function for calculating residuals
+    def compute_residuals(Q: np.array) -> np.array:
+        """Takes an estimation of q as input, and outputs residuals
+
+        Args:
+            Q (np.array): 3x1 point
+        """
+        resids = hom_to_inhom((ps @ Q).reshape(-1, 3).T).T.reshape(-1) - qs
+        return resids
+    
+    
+    x0 = triangulate(qs, ps, return_hom=True)
+    optim = optimize.least_squares(compute_residuals, x0)
+    return optim
+
