@@ -51,7 +51,10 @@ def hom_to_inhom(Q: np.array) -> np.array:
 
 
 def inhom_to_hom(Q: np.array, s: int = 1) -> np.array:
-    return np.vstack(Q, np.ones(Q.shape[1]) * s)
+    if len(Q.shape) == 1:
+        return np.append(Q, 1*s)
+    else:
+        return np.vstack(Q, np.ones(Q.shape[1]) * s)
 
 
 def projectpointsdist(
@@ -183,22 +186,28 @@ def triangulate_nonlin(qs: np.array, ps: np.array) -> np.array:
     """
     
     assert ps.shape[0] % 3 == 0
-    
-    if len(qs.shape) > 1:
-        qs = qs.reshape(-1)
         
     # Function for calculating residuals
     def compute_residuals(Q: np.array) -> np.array:
         """Takes an estimation of q as input, and outputs residuals
+        This is done in the following steps:
+            1 (projection):         First the projection is done on a homogenous Q.
+            2.(inhom_projection):   the projection is made inhomogounous again
+            3 (residuals):          Lastly the loss is calculated by subtracting 
+                                    the estimated points from qs
 
         Args:
             Q (np.array): 3x1 point
         """
-        resids = hom_to_inhom((ps @ Q).reshape(-1, 3).T).T.reshape(-1) - qs
-        return resids
-    
-    
-    x0 = triangulate(qs, ps, return_hom=True)
+        projection = ps @ inhom_to_hom(Q)
+        # print(f"{projection=}")
+        inhom_projection = hom_to_inhom(projection.reshape(-1, 3).T).T.reshape(-1)
+        # print(f"{inhom_projection=}")
+        residuals = inhom_projection - qs.reshape(-1)
+        # print(f"{residuals=}")
+        return residuals
+        # return inner
+    x0 = triangulate(qs, ps, return_hom=False)
+    # compute_residuals(x0)
     optim = optimize.least_squares(compute_residuals, x0)
-    return optim
-
+    return optim["x"]
