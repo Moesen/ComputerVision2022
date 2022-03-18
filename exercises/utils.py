@@ -3,13 +3,18 @@ import matplotlib as plt
 from scipy.interpolate import RegularGridInterpolator
 from scipy import optimize
 from PIL import Image
+from typing import Tuple
+from tqdm import tqdm
+import matplotlib.pyplot as plt
 
 
 def make_projection_matrix(K, R, t):
     return K @ np.append(R, t.reshape(-1, 1), axis=1)
 
 
-def projectpoints(K: np.array, R: np.array, t: np.array, Q: np.array, return_hom = False) -> np.array:
+def projectpoints(
+    K: np.array, R: np.array, t: np.array, Q: np.array, return_hom=False
+) -> np.array:
     """Projects points given a camera-, rotation and translation matrix
     on points Q
 
@@ -34,7 +39,7 @@ def projectpoints(K: np.array, R: np.array, t: np.array, Q: np.array, return_hom
     return_Q = P @ Qh
     if not return_hom:
         return_Q = hom_to_inhom(return_Q)
-        
+
     return return_Q
 
 
@@ -52,9 +57,9 @@ def hom_to_inhom(Q: np.array) -> np.array:
 
 def inhom_to_hom(Q: np.array, s: int = 1) -> np.array:
     if len(Q.shape) == 1:
-        return np.append(Q, 1*s)
+        return np.append(Q, 1 * s)
     else:
-        return np.vstack(Q, np.ones(Q.shape[1]) * s)
+        return np.vstack([Q, np.ones(Q.shape[1]) * s])
 
 
 def projectpointsdist(
@@ -102,7 +107,7 @@ def distort_image(
     # Power to the distances
     powers = np.arange(2, len(dist_coffs) * 2 + 1, step=2).reshape(-1, 1)
     # Distances to the increasing power according to formular
-    power_dists = distances ** powers.T
+    power_dists = distances**powers.T
     # Coefficients times the distances to the powers
     coff_dists = dist_coffs * power_dists
     # Sums of the distances
@@ -148,7 +153,8 @@ def generate_fundemental_matrix(k1: np.array, k2: np.array, r: np.array, t: np.a
     fundemental_matrix = np.linalg.inv(k2.T) @ essential_matrix @ np.linalg.inv(k1)
     return essential_matrix, fundemental_matrix
 
-def triangulate(qs: np.array, ps: np.array, return_hom = False) -> np.array:
+
+def triangulate(qs: np.array, ps: np.array, return_hom=False) -> np.array:
     """Finds a point given pixel coordinates q, and their respective projection matrix p
 
     Args:
@@ -159,12 +165,12 @@ def triangulate(qs: np.array, ps: np.array, return_hom = False) -> np.array:
         np.array: _description_
     """
     # We check whether the shape is alright
-    assert (len(qs.shape) == 1 or qs.shape[1] == 1)
+    assert len(qs.shape) == 1 or qs.shape[1] == 1
     assert ps.shape[0] % 3 == 0
-    
+
     left_side = np.repeat(ps[2::3], 2, axis=0)
     right_side = np.delete(ps, list(range(2, ps.shape[0], 3)), axis=0)
-    
+
     B = left_side * qs - right_side
     A = B.T @ B
     _, _, vh = np.linalg.svd(A)
@@ -173,8 +179,9 @@ def triangulate(qs: np.array, ps: np.array, return_hom = False) -> np.array:
         ret = hom_to_inhom(ret)
     return ret
 
+
 def triangulate_nonlin(qs: np.array, ps: np.array) -> np.array:
-    
+
     """Nonlinear triangulation using least squares method
 
     Args:
@@ -184,16 +191,16 @@ def triangulate_nonlin(qs: np.array, ps: np.array) -> np.array:
     Returns:
         np.array: Closest approximation for point
     """
-    
+
     assert ps.shape[0] % 3 == 0
-        
+
     # Function for calculating residuals
     def compute_residuals(Q: np.array) -> np.array:
         """Takes an estimation of q as input, and outputs residuals
         This is done in the following steps:
             1 (projection):         First the projection is done on a homogenous Q.
             2.(inhom_projection):   the projection is made inhomogounous again
-            3 (residuals):          Lastly the loss is calculated by subtracting 
+            3 (residuals):          Lastly the loss is calculated by subtracting
                                     the estimated points from qs
 
         Args:
@@ -207,7 +214,132 @@ def triangulate_nonlin(qs: np.array, ps: np.array) -> np.array:
         # print(f"{residuals=}")
         return residuals
         # return inner
+
     x0 = triangulate(qs, ps, return_hom=False)
     # compute_residuals(x0)
     optim = optimize.least_squares(compute_residuals, x0)
     return optim["x"]
+
+
+def test_points(n_in, n_out, return_hom=False, random_seed: int = None):
+    if random_seed:
+        np.random.seed(random_seed)
+
+    a = (np.random.rand(n_in) - 0.5) * 10
+    b = np.vstack((a, a * 0.5 + np.random.randn(n_in) * 0.25))
+    points = np.hstack((b, 2 * np.random.randn(2, n_out)))
+    points = np.random.permutation(points.T).T
+
+    if return_hom:
+        points = inhom_to_hom(points)
+
+    return points
+
+
+def estimate_line(a: np.array, b: np.array):
+    if np.product(a.shape) == 2:
+        a = inhom_to_hom(a)
+    if np.product(b.shape) == 2:
+        b = inhom_to_hom(b)
+    c = np.cross(a, b)
+    c[:-1] = c[:-1] / np.linalg.norm(c[:-1])
+    return c
+
+
+def in_or_out(point: np.array, line: np.array, threshold: int = 0.1):
+    # point (3x1), line (3x1)
+    sign = point @ line
+    print(sign)
+    return abs(sign) <= threshold
+
+
+def calc_consenus(points: np.array, line: np.array, threshold: int = 0.1, return_points: bool = False):
+    if points.shape[1] > 3:
+        points = points.T
+    ret_count = np.sum(np.abs(points @ line) <= threshold)
+    ret_points = points[np.abs(points @ line) <= threshold]
+    if return_points:
+        return ret_count, ret_points
+    else:
+        return ret_count
+    
+
+
+def draw_random(
+    points: np.array, n: int = 2, random_seed: int = None
+) -> Tuple[np.array, np.array]:
+    if points.shape[1] > points.shape[0]:
+        points = points.T
+    if random_seed:
+        np.random.seed(random_seed)
+
+    idx = np.random.choice(points.shape[0], n)
+    while len(np.unique(idx)) == 1:
+        idx = np.random.choice(points.shape[0], n)
+    return points[idx].T
+
+
+def RANSAC(
+    points: np.array,
+    threshold: int = 0.1,
+    random_seed=None,
+    return_points: bool = False,
+    p: int = 0.99
+):
+    _max = 0
+    _max_line: np.array = None
+    _points: np.array = None
+
+    num_datapoints = int(points.shape[1])
+
+    def est_n() -> int:
+        _eps = 1 - (_max/num_datapoints)
+        _n = np.log(1-p)/np.log(1-(1-_eps)**num_datapoints)
+        return _n
+    
+    N = 2
+    i = 0
+    
+    while i < N:
+        a, b = draw_random(points, random_seed=random_seed).T
+        line = estimate_line(a, b)
+        count, ret_points = calc_consenus(points, line, threshold=threshold, return_points=True)
+        if count > _max:
+            _max = count
+            _max_line = line
+            _points = ret_points
+        i += 1
+        N = est_n()
+
+    if return_points:
+        return _max_line, _points
+    else:
+        return _max_line
+    
+
+def pca_line(x): #assumes x is a (2 x n) array of points
+    d = np.cov(x)[:, 0]
+    d /= np.linalg.norm(d)
+    l = [d[1], -d[0]]
+    l.append(-(l@x.mean(1)))
+    return np.array(l)
+
+def plot_homo_line(
+    line: np.array, points: np.array, threshold: int, ax: plt.Axes = None
+):
+    assert len(line.shape) == 1
+    a = line[0] / line[1]
+    b = line[2] / line[1]
+
+    inhom_points = hom_to_inhom(points)
+    x = np.linspace(np.min(inhom_points[0]) - 1, np.max(inhom_points[0]) + 1)
+    y = -a * x - b
+
+    plot_frame = ax or plt
+    plot_frame.plot(x, y, c="orange")
+    plot_frame.fill_between(x, y - threshold, y + threshold, alpha=0.3, color="blue")
+    plot_frame.plot(x, y - threshold, "--", c="black")
+    plot_frame.plot(x, y + threshold, "--", c="black")
+    plot_frame.scatter(
+        *inhom_points, c="gray"
+    )  
