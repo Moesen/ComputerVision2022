@@ -6,6 +6,8 @@ from PIL import Image
 from typing import Tuple
 from tqdm import tqdm
 import matplotlib.pyplot as plt
+import cv2
+from scipy import ndimage
 
 
 def make_projection_matrix(K, R, t):
@@ -253,7 +255,9 @@ def in_or_out(point: np.array, line: np.array, threshold: int = 0.1):
     return abs(sign) <= threshold
 
 
-def calc_consenus(points: np.array, line: np.array, threshold: int = 0.1, return_points: bool = False):
+def calc_consenus(
+    points: np.array, line: np.array, threshold: int = 0.1, return_points: bool = False
+):
     if points.shape[1] > 3:
         points = points.T
     ret_count = np.sum(np.abs(points @ line) <= threshold)
@@ -262,7 +266,6 @@ def calc_consenus(points: np.array, line: np.array, threshold: int = 0.1, return
         return ret_count, ret_points
     else:
         return ret_count
-    
 
 
 def draw_random(
@@ -284,7 +287,7 @@ def RANSAC(
     threshold: int = 0.1,
     random_seed=None,
     return_points: bool = False,
-    p: int = 0.99
+    p: int = 0.99,
 ):
     _max = 0
     _max_line: np.array = None
@@ -293,17 +296,19 @@ def RANSAC(
     num_datapoints = int(points.shape[1])
 
     def est_n() -> int:
-        _eps = 1 - (_max/num_datapoints)
-        _n = np.log(1-p)/np.log(1-(1-_eps)**num_datapoints)
+        _eps = 1 - (_max / num_datapoints)
+        _n = np.log(1 - p) / np.log(1 - (1 - _eps) ** num_datapoints)
         return _n
-    
+
     N = 2
     i = 0
-    
+
     while i < N:
         a, b = draw_random(points, random_seed=random_seed).T
         line = estimate_line(a, b)
-        count, ret_points = calc_consenus(points, line, threshold=threshold, return_points=True)
+        count, ret_points = calc_consenus(
+            points, line, threshold=threshold, return_points=True
+        )
         if count > _max:
             _max = count
             _max_line = line
@@ -315,14 +320,15 @@ def RANSAC(
         return _max_line, _points
     else:
         return _max_line
-    
 
-def pca_line(x): #assumes x is a (2 x n) array of points
+
+def pca_line(x):  # assumes x is a (2 x n) array of points
     d = np.cov(x)[:, 0]
     d /= np.linalg.norm(d)
     l = [d[1], -d[0]]
-    l.append(-(l@x.mean(1)))
+    l.append(-(l @ x.mean(1)))
     return np.array(l)
+
 
 def plot_homo_line(
     line: np.array, points: np.array, threshold: int, ax: plt.Axes = None
@@ -340,6 +346,81 @@ def plot_homo_line(
     plot_frame.fill_between(x, y - threshold, y + threshold, alpha=0.3, color="blue")
     plot_frame.plot(x, y - threshold, "--", c="black")
     plot_frame.plot(x, y + threshold, "--", c="black")
-    plot_frame.scatter(
-        *inhom_points, c="gray"
-    )  
+    plot_frame.scatter(*inhom_points, c="gray")
+
+
+def gaussian1DKernel(sigma: float, epsilon: int = None):
+    h = epsilon or np.ceil(4 * sigma)
+    x = np.arange(-h, h + 1)
+
+    g = np.exp(-(x**2) / (2 * sigma**2)) / np.sqrt(2 * np.pi * sigma**2)
+    g /= g.sum()
+    gx = (-x / sigma**2) * g
+
+    g = g.reshape(-1, 1)
+    gx = gx.reshape(-1, 1)
+    return g, gx
+
+
+def gaussianSmoothing(img: np.array, sigma: float):
+    g, gx = gaussian1DKernel(sigma)
+    new_img = cv2.filter2D(img, -1, g)
+    new_img = cv2.filter2D(new_img, -1, g.T)
+
+    gdx = g @ gx.T
+    gdy = gx @ g.T
+
+    Ix = cv2.filter2D(img, -1, gdx)
+    Iy = cv2.filter2D(img, -1, gdy)
+
+    return new_img, Ix, Iy
+
+
+def get_scalespace(im: np.array, sigma: float, n: int) -> np.array:
+    space = []
+    for i in range(n):
+        width = sigma * 2**i
+        space_im, *_ = gaussianSmoothing(im, width)
+        space.append(space_im)
+    return np.array(space)
+
+
+# def get_DoG(im: np.array, sigma: float, n: int) -> np.array:
+def get_DoG(*args) -> np.array:
+    im_scales = get_scalespace(*args)
+    dogs = []
+    for ims1, ims2 in zip(im_scales, im_scales[1:]):
+        dogs.append(ims1 - ims2)
+    return np.array(dogs)
+
+def detect_blobs(im: np.array, sigma: float, n: int, threshold=.1):
+    dogs = get_DoG(im, sigma, n)
+    
+    # non-maximum suppression
+    img2 = ndimage.maximum_filter(dogs, size=1)
+    img_thresh = img2.max() * threshold
+    labels, num_labels = ndimage.label(img2 > img_thresh)    
+    coords = ndimage.measurements.center_of_mass(im, labels=labels, index=np.arange(1, num_labels + 1))
+
+    return np.floor(coords).astype(int)
+
+
+########### VIZ STUFF ###########
+def show_images(imgs: np.array or list, titles=None, cmap="gray", size=5, show_axis="off"):
+    if titles:
+        assert imgs.shape[0] == len(titles)
+    ratio = imgs.shape[1] / imgs.shape[2]
+    h,w = size, size * ratio
+    rows = int(np.ceil(imgs.shape[0] / 2))
+    cols = 2
+
+    fig, axs = plt.subplots(rows, cols, figsize=(h*cols, w*rows))
+    for i in range(imgs.shape[0]):
+        ax = axs.flatten()[i]
+        ax.imshow(imgs[i,...])
+        if titles:
+            ax.set_title(titles[i], fontsize=size*1.5)
+        ax.axis(show_axis)
+    plt.tight_layout()
+    plt.show()
+    return
