@@ -398,17 +398,24 @@ def detect_blobs(im: np.array, sigma: float, n: int, threshold=.1):
     
     # non-maximum suppression
     img2 = ndimage.maximum_filter(dogs, size=1)
-    img_thresh = img2.max() * threshold
+    # img_thresh = img2.max() * threshold
+    img_thresh = threshold
     labels, num_labels = ndimage.label(img2 > img_thresh)    
     coords = ndimage.measurements.center_of_mass(im, labels=labels, index=np.arange(1, num_labels + 1))
 
     return np.floor(coords).astype(int)
 
+def transform_im(im: np.array, theta: float, scale: float) -> np.array:
+    r_img = cv2.resize(im, None, fx=scale, fy=scale)
+    r_img = ndimage.rotate(r_img, theta)
+    return r_img
+    
 
 ########### VIZ STUFF ###########
-def show_images(imgs: np.array or list, titles=None, cmap="gray", size=5, show_axis="off"):
+def show_images(imgs: np.array, titles=None, cmap="gray", size=5, show_axis="off"):
     if titles:
         assert imgs.shape[0] == len(titles)
+        
     ratio = imgs.shape[1] / imgs.shape[2]
     h,w = size, size * ratio
     rows = int(np.ceil(imgs.shape[0] / 2))
