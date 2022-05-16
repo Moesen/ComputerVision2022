@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 from tqdm import tqdm
 import open3d as o3d
 
-folder_path = Path( "../data/casper/" )
+folder_path = Path( "../../data/casper/" )
 img_path = folder_path / "sequence"
 k0, d0, k1, d1, r, t = np.load(
             folder_path / "calib.npy", 
