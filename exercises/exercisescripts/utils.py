@@ -7,6 +7,46 @@ import matplotlib.pyplot as plt
 import cv2
 from scipy import ndimage
 
+
+def create_cameramatrix(f: int, alpha: int, beta: int, dx: int, dy: int):
+    return np.array([[f, beta * f, dx], [0, alpha * f, dy], [0, 0, 1]])
+
+
+def create_R_matrix(theta):
+    return np.array(
+        [
+            [np.cos(np.deg2rad(theta)), 0, np.sin(np.deg2rad(theta))],
+            [0, 1, 0],
+            [-np.sin(np.deg2rad(theta)), 0, np.cos(np.deg2rad(theta))],
+        ]
+    )
+
+
+def box3d(n: int) -> np.ndarray:
+    l = np.linspace(-0.5, 0.5, n)
+    ones = np.zeros(n)
+
+    box = np.array([l, ones, ones])
+    box = np.append(box, [l, ones - 0.5, ones - 0.5], axis=1)
+    box = np.append(box, [l, ones - 0.5, ones + 0.5], axis=1)
+    box = np.append(box, [l, ones + 0.5, ones + 0.5], axis=1)
+    box = np.append(box, [l, ones + 0.5, ones - 0.5], axis=1)
+
+    box = np.append(box, [ones, l, ones], axis=1)
+    box = np.append(box, [ones - 0.5, l, ones - 0.5], axis=1)
+    box = np.append(box, [ones - 0.5, l, ones + 0.5], axis=1)
+    box = np.append(box, [ones + 0.5, l, ones + 0.5], axis=1)
+    box = np.append(box, [ones + 0.5, l, ones - 0.5], axis=1)
+
+    box = np.append(box, [ones, ones, l], axis=1)
+    box = np.append(box, [ones - 0.5, ones - 0.5, l], axis=1)
+    box = np.append(box, [ones - 0.5, ones + 0.5, l], axis=1)
+    box = np.append(box, [ones + 0.5, ones + 0.5, l], axis=1)
+    box = np.append(box, [ones + 0.5, ones - 0.5, l], axis=1)
+
+    return box
+
+
 # Converts color image to gray
 def c2g(im, normalize=True):
     g_im = np.mean(im, axis=2)
@@ -90,9 +130,7 @@ def projectpointsdist(
     return K @ RtQ_homo
 
 
-def distort_image(
-    pixel_values: np.ndarray, K: np.ndarray, dist_coffs: np.ndarray
-) -> np.ndarray:
+def distort_image(img: np.ndarray, K: np.ndarray, dist_coffs: np.ndarray) -> np.ndarray:
     """Transforms an image given distortion coefficients and camera matrix
 
     Args:
@@ -130,7 +168,7 @@ def distort_image(
     # Creating pixel coordinates
     x, y = np.arange(0, 1920), np.arange(0, 1080)
     # Creating interpolator
-    interpolator = RegularGridInterpolator((x, y), pixel_values)
+    interpolator = RegularGridInterpolator((x, y), img)
     # Interpolating pixels
     pixels = (
         interpolator(inhomo_projected.T).reshape((1920, 1080, 3)).transpose((1, 0, 2))
@@ -428,6 +466,57 @@ def transform_im(im: np.ndarray, theta: float, scale: float) -> np.ndarray:
     r_img = cv2.resize(im, None, fx=scale, fy=scale)  # type: ignore
     r_img = ndimage.rotate(r_img, theta)
     return r_img
+
+
+def homogrophy_mapping(p: np.ndarray, H: np.ndarray, set_scale_1 = True):
+    q = H @ p
+    if set_scale_1:
+        q = q / q[2]
+    return q
+
+def makeB(q1, q2):
+    B = np.kron(q2[:,0], np.array([[0,-1,q1[1,0]],[1,0,-q1[0,0]],[-q1[1,0],q1[0,0],0]]))
+    for i in range(1,len(q1[0])):
+        B_temp = np.kron(q2[:,i], np.array([[0,-1,q1[1,i]],[1,0,-q1[0,i]],[-q1[1,i],q1[0,i],0]]))
+        B = np.vstack((B,B_temp))
+    return B
+
+def format_H_to_solution(H):
+    return H*(-2/H[0][0])
+
+def hest(q1: np.ndarray, q2: np.ndarray, normalize=False) -> np.ndarray:
+    t1, t2 = None, None
+
+    # Normalizing
+    if normalize:
+        q1, t1 = normalize2d(q1)
+        q2, t2 = normalize2d(q2)
+
+    B = makeB(q1, q2)
+    # Creating the A matrix
+    A = B.T @ B
+    # Doing svd
+    _, _, vh = np.linalg.svd(A)
+    # Taking the last row of the vh, as those are the eigenvectors with smallest eigenvalues
+    H = np.reshape(vh[-1],(3, 3)).T
+    # Normalizing
+
+    if t1 is not None and t2 is not None:
+        H = np.linalg.inv(t1) @ H @ t2
+
+    return H
+
+
+def normalize2d(Q: np.ndarray):
+    mean, std = np.mean(Q, axis=1), np.std(Q, axis=1)
+    T = np.array(
+        [
+            [1 / std[0], 0, -mean[0] / std[0]],
+            [0, 1 / std[1], -mean[1] / std[1]],
+            [0, 0, 1],
+        ]
+    )
+    return [T @ Q, T]
 
 
 ########### VIZ STUFF ###########
