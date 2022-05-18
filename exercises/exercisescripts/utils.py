@@ -336,7 +336,7 @@ def in_or_out(point: np.ndarray, line: np.ndarray, threshold: float = 0.1):
     return abs(sign) <= threshold
 
 
-def calc_consenus(
+def calc_consenus_line(
     points: np.ndarray,
     line: np.ndarray,
     threshold: float = 0.1,
@@ -352,6 +352,25 @@ def calc_consenus(
         return ret_count
 
 
+def calc_sampsons_distance(F, p1, p2):
+    a1 = (p2.T @ F)[0] ** 2
+    b1 = (p2.T @ F)[1] ** 2
+    a2 = (F @ p1)[0] ** 2
+    b2 = (F @ p1)[1] ** 2
+
+    return (p2.T @ F @ p1) ** 2 * 1 / (a1+ b1 + a2 + b2)
+
+
+def calc_consensus_fest(Fest: np.ndarray, q1: np.ndarray, q2: np.ndarray, sigma: float):
+    threshold = 3.84 * sigma**2
+    inliers = []
+    for i in range(q1.shape[1]):
+        sdist = calc_sampsons_distance(Fest, q1[:, i], q2[:, i])
+        if sdist < threshold:
+            inliers.append(i)
+    return len(inliers), np.asarray(inliers)
+
+
 def draw_random(
     points: np.ndarray, n: int = 2, random_seed: int | None = None
 ) -> np.ndarray:
@@ -364,6 +383,47 @@ def draw_random(
     while len(np.unique(idx)) == 1:
         idx = np.random.choice(points.shape[0], n)
     return points[idx].T
+
+
+def get_features_sift(im1: np.ndarray, im2: np.ndarray):
+    sift = cv2.SIFT_create(nOctaveLayers = 5,
+                           contrastThreshold = 0.04,
+                           edgeThreshold = 10000,
+                           sigma = 1.6)
+
+    kp1, des1 = sift.detectAndCompute(im1, None)
+    kp2, des2 = sift.detectAndCompute(im2, None)
+
+    bf = cv2.BFMatcher_create(crossCheck=True)
+    matches = bf.match(des1, des2)
+
+    p1 = np.array([kp1[m.queryIdx].pt for m in matches]).T
+    p2 = np.array([kp2[m.trainIdx].pt for m in matches]).T
+
+
+    return matches, p1, p2, list(kp1), list(kp2)
+
+
+def RANSAC_8_point(p1s, p2s, sigma=3, itterations=100):
+    _max = 0
+    _max_F = None
+    _best_idx = None
+
+    for i in tqdm(range(itterations)):
+        random_idxs = np.random.choice(np.arange(p1s.shape[1]), 8, replace=False)
+        q1 = p1s[:, random_idxs]
+        q2 = p2s[:, random_idxs]
+
+        Fest = Fest_8point(q1, q2, normalize=True)
+
+        inlier_count, inlier_idx = calc_consensus_fest(Fest, p1s, p2s, sigma)
+        if inlier_count > _max:
+            _max_F = Fest
+            _best_idx = inlier_idx
+            _max = inlier_count
+            print("New best estimate: ", _max)
+    
+    return _max_F, _best_idx
 
 
 def RANSAC(
@@ -390,7 +450,7 @@ def RANSAC(
     while i < N:
         a, b = draw_random(points, random_seed=random_seed).T
         line = estimate_line(a, b)
-        count, ret_points = calc_consenus(
+        count, ret_points = calc_consenus_line(
             points, line, threshold=threshold, return_points=True
         )
         if count > _max:
@@ -454,11 +514,39 @@ def gaussianSmoothing(img: np.ndarray, sigma: float):
     Iy = cv2.filter2D(cv2.filter2D(img, -1, g.T), -1, gx)
     return I, Ix, Iy
 
-def corner_detection(im: np.ndarray, sigma: float , eps: int, k: float, tau: float) -> list:
+
+def corner_detection(
+    im: np.ndarray, sigma: float, eps: int, k: float, tau: float
+) -> np.ndarray:
     r = harris_measure(im, sigma, eps, k)
+    btau = np.where(r < tau * r.max())
+    r[btau] = 0
+    i_idx = np.array([1, -1, 0, 0])
+    j_idx = np.array([0, 0, 1, -1])
 
+    do = True
+    while do:
+        do = False
+        # Transposing for * trick in for loop
+        queue = np.array(np.where(r > 0)).T
+        for idx in range(len(queue)):
+            i, j = queue[idx]
+            # If border pixel set it to zero and return
+            if np.any([0 > i + i_idx, i + i_idx > r.shape[0]]) or np.any(
+                [0 > j + j_idx, j + j_idx > r.shape[1]]
+            ):
+                r[i, j] = 0
+                continue
 
-    return []
+            if (
+                np.all(r[i, j] > r[i + i_idx, j + j_idx])
+                and np.sum(r[i + i_idx, j + j_idx]) > 0
+            ):
+                do = True
+                r[i + i_idx, j + j_idx] = 0
+
+    corners = np.array(np.where(r > 0))
+    return corners
 
 
 def get_scalespace(im: np.ndarray, sigma: float, n: int) -> np.ndarray:
@@ -537,7 +625,7 @@ def make_v_row(H: np.ndarray, i, j):
 def make_v(Hs: list[np.ndarray]) -> np.ndarray:
     return np.vstack(
         [
-            np.vstack([make_v_row(h, 0, 1), make_v_row(h, 0, 0) - make_v_row(h, 1, 1)])
+            np.vstack([make_v_row(h, 0, 1), make_v_row(h, 0, 0) - make_v_row(h, 1, 1)])  # type: ignore
             for h in Hs
         ]
     )
@@ -612,6 +700,23 @@ def makeB(q1: np.ndarray, q2: np.ndarray):
     return np.vstack(
         [np.kron(q1[:, i], cross_op(q2[:, i])) for i in range(q2.shape[1])]
     )
+
+
+def Fest_8point(q1, q2, normalize=True):
+    if normalize:
+        q1, t1 = normalize2d(q1)
+        q2, t2 = normalize2d(q2)
+
+    B = makeB(q1, q2)
+
+    *_, vh = np.linalg.svd(B.T @ B)
+
+    fest = vh[-1].reshape(3, 3).T
+
+    if normalize:
+        fest = t2.T @ fest @ t1  # type: ignore
+
+    return fest
 
 
 def hest(q1: np.ndarray, q2: np.ndarray, normalize=False) -> np.ndarray:

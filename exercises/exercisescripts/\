@@ -92,17 +92,13 @@ def ex5():
 
 def test_ex6():
     square_img, square_edges, weird_img, weird_edges = ex6()
-    fig, [[ax1, ax2], [ax3, ax4]] = plt.subplots(nrows = 2, ncols = 2, figsize=(12, 5))
+    fig, [ax1, ax2, ax3, ax4] = plt.subplots(nrows = 2, ncols = 2, figsize=(12, 12))
     ax1.imshow(square_img)
     ax2.imshow(square_edges)
     ax3.imshow(weird_img)
     ax4.imshow(weird_edges)
-    ax1.axis('off')
-    ax2.axis('off')
-    ax3.axis('off')
-    ax4.axis('off')
-    plt.tight_layout()
-    S.save_fig("ex6-6")
+    plt.show()
+
 
 
 def ex6():
@@ -118,5 +114,4 @@ if __name__ == "__main__":
     # test_ex2()
     # test_ex3()
     # test_ex4()
-    # test_ex5()
-    test_ex6()
+    test_ex5()
