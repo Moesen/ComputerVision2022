@@ -4,8 +4,9 @@ import matplotlib as plt
 from scipy.interpolate import RegularGridInterpolator
 from scipy import optimize
 import matplotlib.pyplot as plt
-import cv2
+from cv2 import cv2
 from scipy import ndimage
+from tqdm import tqdm
 
 
 def create_cameramatrix(f: int, alpha: int, beta: int, dx: int, dy: int):
@@ -57,6 +58,32 @@ def c2g(im, normalize=True):
 
 def make_projection_matrix(K, R, t):
     return K @ np.append(R, t.reshape(-1, 1), axis=1)
+
+
+def smoothed_hessian(im, sigma, epsilon):
+    _, Ix, Iy = gaussianSmoothing(im, sigma=sigma)
+    gx, *_ = gaussian1DKernel(sigma, epsilon)
+
+    C = np.array(
+        [
+            [
+                cv2.filter2D(cv2.filter2D(Ix**2, -1, gx), -1, gx.T),
+                cv2.filter2D(cv2.filter2D(Ix * Iy, -1, gx), -1, gx.T),
+            ],
+            [
+                cv2.filter2D(cv2.filter2D(Ix * Iy, -1, gx), -1, gx.T),
+                cv2.filter2D(cv2.filter2D(Iy**2, -1, gx), -1, gx.T),
+            ],
+        ]
+    )
+    return C
+
+
+def harris_measure(im, sigma, epsilon, k):
+    C = smoothed_hessian(im, sigma, epsilon)
+    a, b, c = C[0, 0, :, :], C[1, 1, :, :], C[0, 1, :, :]
+    r = a * b - c**2 - k * (a + b) ** 2
+    return r
 
 
 def projectpoints(
@@ -182,6 +209,8 @@ def checkerboard_points(n: int, m: int) -> np.ndarray:
     first_row = np.arange(n) - ((n - 1) / 2)
     second_row = np.arange(m) - ((m - 1) / 2)
     combinations = np.array(np.meshgrid(second_row, first_row)).reshape(2, -1)
+    combinations = np.vstack([combinations, np.zeros(n * m)])
+
     return combinations
 
 
@@ -403,30 +432,33 @@ def plot_homo_line(line: np.ndarray, points: np.ndarray, threshold: int, ax=None
 
 
 def gaussian1DKernel(sigma: float, epsilon: int | None = None):
-    h = epsilon or np.ceil(4 * sigma)
+    h = epsilon or np.ceil(5 * sigma)
     x = np.arange(-h, h + 1)
 
     g = np.exp(-(x**2) / (2 * sigma**2)) / np.sqrt(2 * np.pi * sigma**2)
     g /= g.sum()
-    gx = (-x / sigma**2) * g
-
     g = g.reshape(-1, 1)
+    gx = -(-(x**2)) / (sigma**2) * g[:, 0]
     gx = gx.reshape(-1, 1)
-    return g, gx
+    return g, gx, x
 
 
 def gaussianSmoothing(img: np.ndarray, sigma: float):
-    g, gx = gaussian1DKernel(sigma)
-    new_img = cv2.filter2D(img, -1, g)  # type: ignore
-    new_img = cv2.filter2D(new_img, -1, g.T)  # type: ignore
+    # Returns the gaussian smoothed image I, and the image derivatives Ix and Iy.
+    # 1 obtain the kernels for gaussian and for differentiation.
+    g, gx, _ = gaussian1DKernel(sigma=sigma)
+    # 2 Filter the image in both directions and diff in both directions
+    I = cv2.filter2D(cv2.filter2D(img, -1, g), -1, g.T)  # smooth I = g * g.T * I
+    # 3 Differentiate - d/dx I = g * gx.T * I
+    Ix = cv2.filter2D(cv2.filter2D(img, -1, gx.T), -1, g)
+    Iy = cv2.filter2D(cv2.filter2D(img, -1, g.T), -1, gx)
+    return I, Ix, Iy
 
-    gdx = g @ gx.T
-    gdy = gx @ g.T
+def corner_detection(im: np.ndarray, sigma: float , eps: int, k: float, tau: float) -> list:
+    r = harris_measure(im, sigma, eps, k)
 
-    Ix = cv2.filter2D(img, -1, gdx)  # type: ignore
-    Iy = cv2.filter2D(img, -1, gdy)  # type: ignore
 
-    return new_img, Ix, Iy
+    return []
 
 
 def get_scalespace(im: np.ndarray, sigma: float, n: int) -> np.ndarray:
@@ -468,43 +500,100 @@ def transform_im(im: np.ndarray, theta: float, scale: float) -> np.ndarray:
     return r_img
 
 
-def homogrophy_mapping(p: np.ndarray, H: np.ndarray, set_scale_1 = True):
+def homogrophy_mapping(p: np.ndarray, H: np.ndarray, set_scale_1=True):
     q = H @ p
     if set_scale_1:
         q = q / q[2]
     return q
 
-def makeB(q1, q2):
-    B = np.kron(q2[:,0], np.array([[0,-1,q1[1,0]],[1,0,-q1[0,0]],[-q1[1,0],q1[0,0],0]]))
-    for i in range(1,len(q1[0])):
-        B_temp = np.kron(q2[:,i], np.array([[0,-1,q1[1,i]],[1,0,-q1[0,i]],[-q1[1,i],q1[0,i],0]]))
-        B = np.vstack((B,B_temp))
-    return B
+
+def estimate_homopgraphies(Q_omega: np.ndarray, qs: list) -> list:
+    # Takes 3d points as input in list form 3xn,
+    # and a list of Q projected to the image plain from different views
+    assert Q_omega.shape[0] == 3
+    Qo_tilde = inhom_to_hom(Q_omega[:2])
+    homographies = []
+    for q in qs:
+        qh = inhom_to_hom(q)
+        h = hest(qh, Qo_tilde)
+        homographies.append(h)
+
+    return homographies
+
+
+def make_v_row(H: np.ndarray, i, j):
+    return np.array(
+        [
+            H[0][i] * H[0][j],
+            H[0][i] * H[1][j] + H[1][i] * H[0][j],
+            H[1][i] * H[1][j],
+            H[2][i] * H[0][j] + H[0][i] * H[2][j],
+            H[2][i] * H[1][j] + H[1][i] * H[2][j],
+            H[2][i] * H[2][j],
+        ]
+    )
+
+
+def make_v(Hs: list[np.ndarray]) -> np.ndarray:
+    return np.vstack(
+        [
+            np.vstack([make_v_row(h, 0, 1), make_v_row(h, 0, 0) - make_v_row(h, 1, 1)])
+            for h in Hs
+        ]
+    )
+
+
+def estimate_b(Hs: list[np.ndarray]) -> np.ndarray:
+    V = make_v(Hs)  # type: ignore
+    *_, vh = np.linalg.svd(V)
+    b = vh[-1]
+    return b
+
+
+def estimate_intrinsics(Hs: list[np.ndarray]):
+    # Estimating b
+    b = estimate_b(Hs)
+    [b11, b12, b22, b13, b23, b33] = b
+
+    # Intrinsic values from appendix b
+    v0 = (b12 * b13 - b11 * b23) / (b11 * b22 - b12**2)
+    l = b33 - (b13**2 + v0 * (b12 * b13 - b11 * b23)) / b11
+    alpha = np.sqrt(l / b11)
+    beta = np.sqrt(l * b11 / (b11 * b22 - b12**2))
+    gamma = b12 * alpha**2 * beta / l
+    u0 = (gamma * v0 / beta) - (b13 * alpha**2 / l)
+
+    return np.array([[alpha, gamma, u0], [0, beta, v0], [0, 0, 1]])
+
+
+def estimate_extrinsics(K: np.ndarray, Hs: list) -> tuple:
+    rots = []
+    tran = []
+
+    for H in Hs:
+        l = 1 / np.linalg.norm(np.linalg.inv(K) @ H[:, 0], 2)
+
+        r1 = l * np.linalg.inv(K) @ H[:, 0]
+        r2 = l * np.linalg.inv(K) @ H[:, 1]
+        r3 = np.cross(r1, r2)
+
+        t = (l * np.linalg.inv(K) @ H[:, 2]).T
+
+        rots.append(np.vstack([r1, r2, r3]).T)
+        tran.append(t.T)
+
+    return rots, tran
+
+
+def calibratecamera(qs, Q):
+    Hs = estimate_homopgraphies(Q, qs)
+    K = estimate_intrinsics(Hs)
+    Rs, ts = estimate_extrinsics(K, Hs)
+    return K, Rs, ts
+
 
 def format_H_to_solution(H):
-    return H*(-2/H[0][0])
-
-def hest(q1: np.ndarray, q2: np.ndarray, normalize=False) -> np.ndarray:
-    t1, t2 = None, None
-
-    # Normalizing
-    if normalize:
-        q1, t1 = normalize2d(q1)
-        q2, t2 = normalize2d(q2)
-
-    B = makeB(q1, q2)
-    # Creating the A matrix
-    A = B.T @ B
-    # Doing svd
-    _, _, vh = np.linalg.svd(A)
-    # Taking the last row of the vh, as those are the eigenvectors with smallest eigenvalues
-    H = np.reshape(vh[-1],(3, 3)).T
-    # Normalizing
-
-    if t1 is not None and t2 is not None:
-        H = np.linalg.inv(t1) @ H @ t2
-
-    return H
+    return H * (-2 / H[0][0])
 
 
 def normalize2d(Q: np.ndarray):
@@ -517,6 +606,52 @@ def normalize2d(Q: np.ndarray):
         ]
     )
     return [T @ Q, T]
+
+
+def makeB(q1: np.ndarray, q2: np.ndarray):
+    return np.vstack(
+        [np.kron(q1[:, i], cross_op(q2[:, i])) for i in range(q2.shape[1])]
+    )
+
+
+def hest(q1: np.ndarray, q2: np.ndarray, normalize=False) -> np.ndarray:
+    t1, t2 = None, None
+
+    # Normalizing
+    if normalize:
+        q1, t1 = normalize2d(q1)
+        q2, t2 = normalize2d(q2)
+
+    B = makeB(q2, q1)
+    # Creating the A matrix
+    A = B.T @ B
+    # Doing svd
+    _, _, vh = np.linalg.svd(A)
+    # Taking the last row of the vh, as those are the eigenvectors with smallest eigenvalues
+    H = np.reshape(vh[-1], (3, 3)).T
+    # Normalizing
+
+    if t1 is not None and t2 is not None:
+        H = np.linalg.inv(t1) @ H @ t2
+
+    return H
+
+
+def DLT(Qh: np.ndarray, qh: np.ndarray, normalize=False) -> np.ndarray:
+    t1 = None
+
+    if normalize:
+        qh, t1 = normalize2d(qh)
+
+    B = makeB(Qh, qh)
+    *_, vh = np.linalg.svd(B.T @ B)
+    Pest = vh[-1].reshape((4, 3)).T
+
+    if t1 is not None:
+        Pest = np.linalg.inv(t1) @ Pest
+
+    Pest = Pest / Pest[-1, -1] * 10
+    return Pest
 
 
 ########### VIZ STUFF ###########

@@ -7,7 +7,9 @@ from pathlib import Path
 import os
 import matplotlib as mpl
 from tqdm import tqdm
+from exam_utils import ImgSaver
 
+S = ImgSaver()
 
 mpl.rc("image", cmap="gray")
 img_path = Path("../../data/calibration")
@@ -42,21 +44,52 @@ def test_ex6(imgs: list, image_points: list) -> None:
     plt.show()
 
 
-def ex6() -> tuple[list, list]:
+def ex6(samples=None) -> tuple[list, list]:
     img_fns = [x.as_posix() for x in img_path.iterdir() if ".jpg" in x.as_posix()]
-    img_fns = img_fns
+    img_fns = img_fns[:samples]
     imgs = load_imgs(img_fns)
     imgs, img_points = find_checkerpoints(imgs)
     return imgs, img_points
 
-def test_ex7():
-    pass
 
-def ex7(img: list, image_points: list):
-    checker_points = u.checkerboard_points(7, 10)
-    objpoints = []
+def test_ex7():
+    ex7()
+
+
+def ex7():
+    images, image_points = ex6()
+    checker_points = u.checkerboard_points(10, 7)
+    # Making found image_points 2d
+    x, _, y = image_points[0].shape
+    ps2d = [q.reshape(x, y).T for q in image_points]
+
+    K, R, t = u.calibratecamera(ps2d, checker_points)
+    return K, R, t, checker_points, ps2d, images
+
+
+def test_ex8():
+    images, qs, detected_points = ex8()
+    fig, axs = plt.subplots(3, 5, figsize=(25,10))
+    for ax, img, q, dp  in zip(axs.flatten(), images, qs, detected_points):
+        ax.imshow(img)
+        ax.scatter(*q, s=10, c="red")
+        err = np.sqrt(np.mean((q- dp)**2))
+        ax.set_title(f"{err=:.2f}")
+        ax.grid("off")
+        ax.axis("off")
+    plt.tight_layout()
+    S.save_fig("ex5-8")
+
+
+def ex8():
+    K, Rs, ts, checker_points, detected_points, images = ex7()
+    Ps = [u.make_projection_matrix(K, R, t) for R, t in zip(Rs, ts)]
+    qs = [u.hom_to_inhom( P @ u.inhom_to_hom(checker_points)) for P in Ps]
+    return images, qs, detected_points
+
 
 if __name__ == "__main__":
-    images, image_points = ex6()
-#    test_ex6(images, image_points)
-    ex7(images, image_points)
+    # images, image_points = ex6()
+    # test_ex6(images, image_points)
+    # test_ex7()
+    test_ex8()

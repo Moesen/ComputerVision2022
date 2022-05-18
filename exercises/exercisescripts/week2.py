@@ -140,6 +140,8 @@ def test_ex7():
     t = f"{t = }"
     s = ps + stds + means + t
     S.save_txt("ex2-7", s)
+    print("ex7")
+    print(s)
 
 
 def ex7():
@@ -156,6 +158,8 @@ def test_ex8():
     Hnest = u.format_H_to_solution(Hnest).round(5)
     s = f"H:\n{H=}\n Hest:\n{Hest=}\n Hnest:\n{Hnest=}\n"
     S.save_txt("ex2-8", s)
+    print("ex8")
+    print(s)
 
 
 def ex8():
@@ -173,6 +177,8 @@ def test_ex9():
     Hest = u.format_H_to_solution(Hest).round(5)
     s = f"H:\n{H=}\n Hest:\n{Hest=}\n"
     S.save_txt("ex2-9", s)
+    print("ex9")
+    print(s)
 
 
 def ex9():
@@ -196,7 +202,7 @@ if __name__ == "__main__":
     #   test_ex2()
     #   test_ex4()
     #   test_ex5()
-    #   test_ex6()
-    #   test_ex7()
-    #   test_ex8()
+    test_ex6()
+    test_ex7()
+    test_ex8()
     test_ex9()
