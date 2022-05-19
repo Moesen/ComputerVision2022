@@ -86,11 +86,15 @@ def demo_ex9():
 def test_ex9():
     img1, img2, F = ex8()
 
-    _, [ax1, ax2] = plt.subplots(1, 2, figsize=(12, 5))
+    _, [ax1, ax2] = plt.subplots(1, 2, figsize=(10, 5))
     ax1.grid(False)
     ax2.grid(False)
     ax1.imshow(img1, cmap="gray")
     ax2.imshow(img2, cmap="gray")
+    ax1.grid(False)
+    ax1.axis("off")
+    ax2.grid(False)
+    ax2.axis("off")
 
     points = np.array([[100 , 500, 700 ],[300, 100, 500]])
     ax1.scatter(*points)
@@ -99,12 +103,13 @@ def test_ex9():
         l = F @ p
         draw_line(l, img2.shape, ax2)
 
+    plt.tight_layout()
     S.save_fig("ex3-9")
 
 
 
 if __name__ == "__main__":
     # test_ex1()
-    # test_ex8()
+    test_ex8()
     # demo_ex9()
     test_ex9()

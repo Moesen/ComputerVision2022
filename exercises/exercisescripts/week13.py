@@ -4,6 +4,9 @@ from cv2 import cv2
 import matplotlib.pyplot as plt
 from tqdm import tqdm
 import open3d as o3d
+from exam_utils import ImgSaver
+
+S = ImgSaver()
 
 folder_path = Path( "../../data/casper/" )
 img_path = folder_path / "sequence"
@@ -50,7 +53,9 @@ def test_ex1(im0, im1):
     _, ( ax0, ax1 ) = plt.subplots(1, 2)
     ax0.imshow(im0)
     ax1.imshow(im1)
-    plt.show()
+    plt.tight_layout()
+    S.save_fig("ex13-1")
+    plt.close()
 
 def unwrap(ims: list):
     # List of primary and secondary img
@@ -91,7 +96,9 @@ def test_ex2(theta0, theta1):
     _, ( ax0, ax1 ) = plt.subplots(1, 2)
     ax0.imshow(theta0)
     ax1.imshow(theta1)
-    plt.show() 
+    plt.tight_layout()
+    S.save_fig("ex13-2")
+    plt.close()
 
 def create_mask(ims: list, threshold=15):
     mask = (ims[0] - ims[1]) > threshold
@@ -106,7 +113,9 @@ def test_ex3(mask0, mask1):
     _, ( ax0, ax1 ) = plt.subplots(1, 2)
     ax0.imshow(mask0, cmap="gray")
     ax1.imshow(mask1, cmap="gray")
-    plt.show() 
+    plt.tight_layout()
+    S.save_fig("ex13-3")
+    plt.close()
 
 def compute_disparity_matrix(t0, t1, m0, m1, verbose=True):
     disp = np.zeros_like(t0)
@@ -135,11 +144,11 @@ def ex4(t0, t1, m0, m1, verbose=True):
 def test_ex4(disp):
     im = cv2.medianBlur(disp.astype(np.float32), 5)
     # breakpoint()
+    plt.close()
     plt.imshow(im)
-    plt.show()
+    plt.tight_layout()
+    S.save_fig("ex13-4")
 
-def triangulate_points():
-    pass
 
 def ex5(q0, q1, p0, p1):
     # Reshaping matches to adhere
@@ -157,12 +166,12 @@ def test_ex5(Q):
 
 if __name__ == "__main__":
     ims0, ims1, [*_, p0, p1] = ex1()
-    # test_ex1(ims0[0], ims1[0])
+    test_ex1(ims0[0], ims1[0])
     theta0, theta1 = ex2(ims0, ims1)
-    # test_ex2(theta0, theta1)
+    test_ex2(theta0, theta1)
     mask0, mask1 = ex3(ims0, ims1)
-    # test_ex3(mask0, mask1)
+    test_ex3(mask0, mask1)
     disparity, q0s, q1s = ex4(theta0, theta1, mask0, mask1, verbose=False)
-    # test_ex4(disparity)
+    test_ex4(disparity)
     Q = ex5(q0s, q1s, p0, p1)
-    test_ex5(Q)
+    # test_ex5(Q)

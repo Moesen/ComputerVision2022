@@ -24,11 +24,11 @@ def test_ex1():
 
 
 def ex1():
-    return u.gaussian1DKernel(2)
+    return u.gaussian1DKernel(10)
 
 def test_ex2():
     I, Ix, Iy = ex2()
-    _, [ax2, ax3, ax4] = plt.subplots(1, 3, figsize=(20, 5))
+    _, [ax2, ax3, ax4] = plt.subplots(1, 3)
     ax2.imshow(I)
     ax2.set_title("Filtered image")
     ax3.imshow(Ix)
@@ -41,8 +41,8 @@ def test_ex2():
 
 def ex2():
     img = cv2.imread((img_path / "TestIm1.png").as_posix())
-    img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-    return u.gaussianSmoothing(img, 2)
+    img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY).astype(float)
+    return u.gaussianSmoothing(img, 10)
     
 def test_ex3(): 
     C = ex3()
@@ -59,7 +59,7 @@ def ex3():
 
 def test_ex4():
     r, img = ex4()
-    _, [ax1, ax2] = plt.subplots(1, 2, figsize=(10, 10))
+    _, [ax1, ax2] = plt.subplots(1, 2)
     ax1.imshow(img)
     ax2.imshow(r)
     x, y = np.where(r < 0)
@@ -92,7 +92,7 @@ def ex5():
 
 def test_ex6():
     square_img, square_edges, weird_img, weird_edges = ex6()
-    fig, [[ax1, ax2], [ax3, ax4]] = plt.subplots(nrows = 2, ncols = 2, figsize=(12, 5))
+    fig, [[ax1, ax2], [ax3, ax4]] = plt.subplots(nrows = 2, ncols = 2)
     ax1.imshow(square_img)
     ax2.imshow(square_edges)
     ax3.imshow(weird_img)

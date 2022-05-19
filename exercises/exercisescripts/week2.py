@@ -68,9 +68,10 @@ def ex2():
 
 
 def test_ex4():
-    undistorted_img = ex4()
-    plt.figure()
-    plt.imshow(undistorted_img)
+    undistorted_img, img = ex4()
+    _, [ax1, ax2] = plt.subplots(2, 1)
+    ax1.imshow(img.transpose(1, 0, 2))
+    ax2.imshow(undistorted_img)
     S.save_fig("ex2-4")
 
 
@@ -94,7 +95,7 @@ def ex4():
     dist = np.array([k3, k5, k7])
     undistorted_img = u.distort_image(img, K, dist)
 
-    return undistorted_img
+    return undistorted_img, img
 
 
 def test_ex5():
@@ -200,9 +201,9 @@ def ex10():
 if __name__ == "__main__":
     #   test_ex1()
     #   test_ex2()
-    #   test_ex4()
+    test_ex4()
     #   test_ex5()
-    test_ex6()
-    test_ex7()
-    test_ex8()
-    test_ex9()
+    # test_ex6()
+    # test_ex7()
+    # test_ex8()
+    # test_ex9()

@@ -23,7 +23,8 @@ def ex11() -> np.ndarray:
 def test_ex12():
     projected = ex12()
     plt.figure(figsize=(10, 10))
-    plt.scatter(*projected)
+    plt.scatter(*projected, s=20)
+    plt.grid(True)
     plt.xlim((-0.5, 0.5))
     plt.ylim((-0.5, 0.5))
     S.save_fig("ex1-12")
@@ -32,7 +33,7 @@ def test_ex12():
 def ex12() -> np.ndarray:
     box = u.box3d(16)
     K = np.array([[1, 0, 0], [0, 1, 0], [0, 0, 1]])
-    t = np.array([[0, 0, 3]]).T
+    t = np.array([[0, 0, 4]]).T
     R = K.copy()
     projected = u.projectpoints(K, R, t, box)
     return projected
@@ -41,17 +42,20 @@ def ex12() -> np.ndarray:
 def test_ex13():
     projected = ex13()
     plt.figure(figsize=(10, 10))
-    plt.scatter(*projected[:2])
+    plt.scatter(*projected[:2], s=20)
+    plt.grid(True)
     plt.xlim((-0.5, 0.5))
     plt.ylim((-0.5, 0.5))
     S.save_fig("ex1-13")
 
 
-def ex13(theta: int = -30, t: np.ndarray = np.array([0, 0.1, 0])) -> np.ndarray:
+def ex13(theta: int = -30, t: np.ndarray = np.array([0, 0, 4])) -> np.ndarray:
     box = u.box3d(16)
     R = u.create_R_matrix(theta)
-    K = np.array([[.5, 0, 0], [0, 1.5, 0], [0, 0, .5]])
+    K = np.array([[1, 0, 0], [0, 1, 0], [0, 0, 1]])
     projected = u.projectpoints(K, R, t, box, return_hom=True)
+    plt.xlim((-0.5, 0.5))
+    plt.ylim((-0.5, 0.5))
     return projected
 
 def test_ex14():

@@ -13,141 +13,197 @@
 \inserttitlepage
 
 \begin{frame}{ Week 1: Homogeneous coordinates and pinhole model }
-	\begin{column}
-	\begin{column}{.5\textwidth}
+\begin{columns}
+	\begin{column}{.3\textwidth}
+		\begin{block}{box3d(n)}
+			\includegraphics[width=\textwidth]{exercise_imgs/ex1-11.png}
+		\end{block}					
 	\end{column}	
-\begin{column}{.5\textwidth}\end{column}	
+	\begin{column}{.3\textwidth}
+		\begin{block}{Project points}
+			\includegraphics[width=\textwidth]{exercise_imgs/ex1-12.png}
+		\end{block}					
 	\end{column}	
+	\begin{column}{.3\textwidth}
+		\begin{block}{Projection with rotation}
+			\includegraphics[width=\textwidth]{exercise_imgs/ex1-13.png}
+		\end{block}					
+	\end{column}	
+\end{columns}	
 \end{frame}
 
 \begin{frame}{ Week 2: Camera model and homographies }
+\begin{columns}
+	\begin{column}{.3\textwidth}
+		\begin{block}{$\delta r(r) = -0.2^2$}
+			\begin{center}
+				\includegraphics[width=1\textwidth]{exercise_imgs/ex2-2.png}
+			\end{center}
+		\end{block}					
+	\end{column}	
+	\begin{column}{.7\textwidth}
+		\begin{block}{Straigtened image}
+			\includegraphics[width=\textwidth]{exercise_imgs/ex2-4.png}
+		\end{block}					
+	\end{column}	
+\end{columns}	
+
 \end{frame}
 
 \begin{frame}{ Week 3: Multi-view geometry }
+\begin{columns}
+	\begin{column}{.5\textwidth}
+		\begin{block}{Images side by side}
+			\begin{center}
+				\includegraphics[width=\textwidth]{exercise_imgs/ex3-8.png}
+			\end{center}
+		\end{block}					
+	\end{column}	
+	\begin{column}{.5\textwidth}
+		\begin{block}{Epipolar point to line}
+		\begin{center}
+			\includegraphics[width=\textwidth]{exercise_imgs/ex3-9.png}
+		\end{center}
+		\end{block}					
+	\end{column}	
+\end{columns}	
+
 \end{frame}
 
 \begin{frame}{ Week 4: Camera calibration }
+\begin{columns}
+	\begin{column}{.5\textwidth}
+		\begin{block}{Rotated checkerboard points}
+			\begin{center}
+				\includegraphics[width=\textwidth]{exercise_imgs/ex4-4-1.png}
+			\end{center}
+		\end{block}					
+	\end{column}	
+	\begin{column}{.5\textwidth}
+		\begin{block}{As seen from image plane}
+		\begin{center}
+			\includegraphics[width=\textwidth]{exercise_imgs/ex4-4-2.png}
+		\end{center}
+		\end{block}					
+	\end{column}	
+\end{columns}	
 \end{frame}
 
 \begin{frame}{ Week 5: Nonlinear optimization and camera calibration }
+	\begin{block}{Reprojected checkerboard points, total pixel error shown as title}
+		\begin{center}	
+			\includegraphics[width=\textwidth]{exercise_imgs/ex5-8.png}
+		\end{center}
+	\end{block}
 \end{frame}
 
 \begin{frame}{ Week 6: Simple features }
+	\begin{columns}
+		\begin{column}{.45\textwidth}
+			\begin{block}{Harris corner detection}
+			\includegraphics[width=\textwidth]{exercise_imgs/ex6-5.png}
+			\end{block}
+		\end{column}
+		\begin{column}{.45\textwidth}
+			\begin{block}{Canny edge detector}
+			\includegraphics[width=\textwidth]{exercise_imgs/ex6-6.png}
+			\end{block}
+		\end{column}
+	\end{columns}
 \end{frame}
 
 \begin{frame}{ Week 7: Robust model fitting }
+	\begin{columns}
+		\begin{column}{.45\textwidth}
+			\begin{block}{RANSAC for estimating lines}
+			\includegraphics[width=\textwidth]{exercise_imgs/ex7-5.png}
+			\end{block}
+		\end{column}
+		\begin{column}{.45\textwidth}
+			\begin{block}{Line fitted to inliers with PCA}
+			\includegraphics[width=\textwidth]{exercise_imgs/ex7-7.png}
+			\end{block}
+		\end{column}
+	\end{columns}
 \end{frame}
 
 \begin{frame}{ Week 8: Transform invariant features }
+	\begin{columns}
+		\begin{column}{.45\textwidth}
+			\begin{block}{Detected points}
+			\includegraphics[width=\textwidth]{exercise_imgs/ex8-1.png}
+			\end{block}
+		\end{column}
+		\begin{column}{.45\textwidth}
+			\begin{block}{Matched detected points}
+			\includegraphics[width=\textwidth]{exercise_imgs/ex8-2.png}
+			\end{block}
+		\end{column}
+	\end{columns}
 \end{frame}
 
 \begin{frame}{ Week 9: Geometry constrained feature matching }
+	\begin{block}{Without and with Fest-8point regularization}
+		\begin{center}
+			\includegraphics[width=.5\textwidth]{exercise_imgs/ex9-4.png}
+		\end{center}
+	\end{block}
 \end{frame}
 
 \begin{frame}{ Week 10: Image stitching }
+	\begin{columns}
+		\begin{column}{.45\textwidth}
+			\begin{block}{Warp of right image using hest}
+			\includegraphics[width=\textwidth]{exercise_imgs/ex10-4.png}
+			\end{block}
+		\end{column}
+		\begin{column}{.45\textwidth}
+			\begin{block}{Stitched images}
+			\includegraphics[width=\textwidth]{exercise_imgs/ex10-5.png}
+			\end{block}
+		\end{column}
+	\end{columns}
+
 \end{frame}
 
 \begin{frame}{ Week 11-12: Motion estimation }
+	\begin{columns}
+		\begin{column}{.65\textwidth}
+			\begin{block}{Common matched points}
+			\includegraphics[width=\textwidth]{exercise_imgs/ex11-3.png}
+			\end{block}
+		\end{column}
+		\begin{column}{.3\textwidth}
+			\begin{block}{Common points in 3d space}
+				\begin{center}
+					\includegraphics[width=1.5\textwidth]{exercise_imgs/ex11-4.png}
+				\end{center}
+			\end{block}
+		\end{column}
+	\end{columns}
 \end{frame}
 
 \begin{frame}{ Week 13: Structured light }
+	\begin{columns}
+		\begin{column}{.3\textwidth}
+			\begin{block}{Rectified}
+			\includegraphics[width=\textwidth]{exercise_imgs/ex13-1.png}
+			\end{block}
+		\end{column}
+		\begin{column}{.3\textwidth}
+			\begin{block}{Phase}
+				\begin{center}
+					\includegraphics[width=\textwidth]{exercise_imgs/ex13-2.png}
+				\end{center}
+			\end{block}
+		\end{column}
+		\begin{column}{.3\textwidth}
+			\begin{block}{Disparity}
+				\begin{center}
+					\includegraphics[width=\textwidth]{exercise_imgs/ex13-4.png}
+				\end{center}
+			\end{block}
+		\end{column}
+	\end{columns}
 \end{frame}
-
-
-
-\begin{frame}{Equations}
-The ideal gas law is shown in .
-\begin{equation}
-    p \cdot V = n \cdot R \cdot T
-\end{equation}
-
-\begin{equation} \label{eq:IME}
-    \frac{\partial}{\partial t} \int_{0}^{\delta} U dy = - \delta \frac{1}{\rho}\frac{\partial P}{\partial x}-U_f(t)^2
-\end{equation}
-
-\end{frame}
-
-\begin{frame}{More equations}
-\begin{equation}
-\begin{aligned} 
-    CH_3COOH + OH^{-} \&\rightleftharpoons CH_3COO^{-} + H_2O \\
-    H_2O \&\rightleftharpoons H^{+}_{(aq)} + OH^{-}_{(aq)}
-\end{aligned}
-\end{equation}
-
-
-\begin{align} 
-    \label{eq:align1}     
-    f(x) \&= 1 + x - 3 x^2 \\
-    \label{eq:align2} 
-    g(x) + y \&= 3x - \frac{1}{2} x^3 
-\end{align}
-\end{frame}
-
-\begin{frame}[allowframebreaks]{Probability}
-    \begin{block}{Law of total probability for random variables}
-    Let \(X,Y\) be random variables where \(x,y\) represent possible values, it holds that:
-    \[
-        P(x) = \sum_y P(x,y) = \sum_y P(x|y)\cdot P(y)
-    \]
-    \end{block}
-    \framebreak
-    
-    
-    \begin{block}{Bayes' theorem}
-    \begin{itemize}
-        \item For any two events \(A\) and \(B\) in the sample space \(S\), where \(\mathds{P}(B) \neq 0\), it holds that
-        \[\mathds{P}(A|B) = \frac{\mathds{P}(P|A) \cdot \mathds{P}(A)}{\mathds{P}(B)}\]
-        \item Let \(A_1, A_2, \dots , A_K\) be a \textit{partition} of the sample space \(S\). Using the \textit{law of total probability} for \(\mathds{P}(B)\), it then holds that:
-        \[
-            \mathds{P}(A_j | B) = \frac{\mathds{P}(B|A_j) \cdot \mathds{(A_j)}}{\sum_k \mathds{P}(B|A_k) \cdot \mathds{P}(A_k)}
-        \]
-    \end{itemize}
-    \end{block}
-\end{frame}
-
-\begin{frame}{Generalising problem-solving by searching}
-
-So far we have only considered search problems in environments that are:
-\begin{itemize}
-    \item \textbf{Single agent.} There is a single agent acting, the one we control.
-    \item \textbf{Static.} When the agent is not acting, the world doesn't change.
-    \item \textbf{Deterministic.} Every action has a unique outcome.
-    \item \textbf{Fully observable.} The full state description is accesible to the agent.
-\end{itemize}
-Problem solving in the real world rarely satisfies these assumptions.
-
-Today, we will drop the assumption that the environment is deterministic and fully observable. We will also shortly consider generalising beyond single-agent and static environments.
-
-\end{frame}
-
-\begin{frame}{Hej}
-    med dig
-\end{frame}
-
-
 \end{document}
-\documentclass[aspectratio=169,hyperref={pdfpagelabels=false}]{beamer}
-\input{preamble.tex}
-
-\subtitle{Gustav Lang Moesmand}
-\title{Computer Vision Exam Slides}
-
-\setdepartment{DTU Compute}
-\setcolor{dtured}
-
-
-
-\begin{document}
-\inserttitlepage
-
-
-\begin{frame}{ Week 1: Homogeneous coordinates and pinhole model }
-\end{frame}
-
-\begin{frame}{ Week 2: Camera model and homographies }
-\end{frame}
-
-\begin{frame}{ Week 3: Multi-view geometry }
-\end{frame}
-
