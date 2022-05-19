@@ -7,6 +7,7 @@ import matplotlib.pyplot as plt
 from cv2 import cv2
 from scipy import ndimage
 from tqdm import tqdm
+from pathlib import Path
 
 
 def create_cameramatrix(f: int, alpha: int, beta: int, dx: int, dy: int):
@@ -263,6 +264,18 @@ def triangulate(qs: np.ndarray, ps: np.ndarray, return_hom=False) -> np.ndarray:
     return ret
 
 
+def approx_dist_hest(Hest, p1, p2):
+    q1 = hom_to_inhom(p1)
+    q2 = hom_to_inhom(p2)
+    left_dist = q1 - hom_to_inhom(Hest @ p2)
+    right_dist = q2 - hom_to_inhom(np.linalg.pinv(Hest) @ p1)
+
+    return (
+        np.linalg.norm(left_dist, axis=0, ord=2) ** 2
+        + np.linalg.norm(right_dist, axis=0, ord=2) ** 2
+    )
+
+
 def triangulate_nonlin(qs: np.ndarray, ps: np.ndarray) -> np.ndarray:
 
     """Nonlinear triangulation using least squares method
@@ -358,7 +371,7 @@ def calc_sampsons_distance(F, p1, p2):
     a2 = (F @ p1)[0] ** 2
     b2 = (F @ p1)[1] ** 2
 
-    return (p2.T @ F @ p1) ** 2 * 1 / (a1+ b1 + a2 + b2)
+    return (p2.T @ F @ p1) ** 2 * 1 / (a1 + b1 + a2 + b2)
 
 
 def calc_consensus_fest(Fest: np.ndarray, q1: np.ndarray, q2: np.ndarray, sigma: float):
@@ -369,6 +382,56 @@ def calc_consensus_fest(Fest: np.ndarray, q1: np.ndarray, q2: np.ndarray, sigma:
         if sdist < threshold:
             inliers.append(i)
     return len(inliers), np.asarray(inliers)
+
+
+def calc_consensus_hest(Hest: np.ndarray, q1: np.ndarray, q2: np.ndarray, sigma: float):
+    threshold = 3.84 * sigma**2
+    inliers_idx = np.where(approx_dist_hest(Hest, q1, q2) < threshold)[0]
+    return inliers_idx
+
+
+def RANSAC_Hest(p1s, p2s, sigma=3, itterations=1000):
+    max_count = 0
+    best_idx = None
+    best_Hest = None
+
+    for i in tqdm(range(itterations)):
+        random_idx = np.random.choice(np.arange(p1s.shape[1]), 8, replace=False)
+        q1 = p1s[:, random_idx]
+        q2 = p2s[:, random_idx]
+
+        Hest = hest(q1, q2)
+
+        inliers = calc_consensus_hest(Hest, p1s, p2s, sigma)
+        if len(inliers) > max_count:
+            max_count = len(inliers)
+            best_idx = inliers
+            best_Hest = Hest
+
+    # Checking if final hest is good or bad match
+    if best_Hest is None or best_Hest[1, 1] == 0:
+        print("bad match")
+    return best_Hest, best_idx
+
+
+def warp_image(img, Hest, xrange, yrange):
+    T = np.eye(3)
+    T[:2, 2] = [-xrange[0], -yrange[0]]
+    H = T @ Hest
+    outSize = (xrange[1] - xrange[0], yrange[1] - yrange[0])
+    imWarp = cv2.warpPerspective(img, H, outSize)
+    maskWarp = cv2.warpPerspective(np.ones(img.shape[:2], dtype=np.uint8), H, outSize)
+    return imWarp, maskWarp
+
+
+def stich_images(img1, img2, Hest, xrange, yrange):
+    xrange = (np.array([img1.shape[1], img1.shape[0]]) * xrange).astype(int).tolist()
+    yrange = (np.array([img2.shape[1], img2.shape[0]]) * yrange).astype(int).tolist()
+    imwarp1, maskwarp1 = warp_image(img1, Hest, xrange, yrange)
+    imwarp2, maskwarp2 = warp_image(img2, np.eye(3, 3), xrange, yrange)
+    imwarp2[maskwarp1 == 1] = imwarp1[maskwarp1 == 1]
+    maskwarp2[maskwarp1 == 1] = maskwarp1[maskwarp1 == 1]
+    return imwarp2
 
 
 def draw_random(
@@ -385,23 +448,44 @@ def draw_random(
     return points[idx].T
 
 
-def get_features_sift(im1: np.ndarray, im2: np.ndarray):
-    sift = cv2.SIFT_create(nOctaveLayers = 5,
-                           contrastThreshold = 0.04,
-                           edgeThreshold = 10000,
-                           sigma = 1.6)
+def get_features_sift(im1: np.ndarray, im2: np.ndarray, knn_k: int | None = None):
+    sift = cv2.SIFT_create()
 
     kp1, des1 = sift.detectAndCompute(im1, None)
     kp2, des2 = sift.detectAndCompute(im2, None)
 
-    bf = cv2.BFMatcher_create(crossCheck=True)
-    matches = bf.match(des1, des2)
+    bf = cv2.BFMatcher_create()
 
-    p1 = np.array([kp1[m.queryIdx].pt for m in matches]).T
-    p2 = np.array([kp2[m.trainIdx].pt for m in matches]).T
+    if knn_k is not None:
+        matches = bf.knnMatch(des1, des2, k=knn_k)
+        matches = [[m] for m, n in matches if m.distance < 0.9 * n.distance]
+        p1 = np.array([kp1[m[0].queryIdx].pt for m in matches]).T
+        p2 = np.array([kp2[m[0].trainIdx].pt for m in matches]).T
+    else:
+        matches = bf.match(des1, des2)
+        p1 = np.array([kp1[m.queryIdx].pt for m in matches]).T
+        p2 = np.array([kp2[m.trainIdx].pt for m in matches]).T
 
+    return matches, p1, p2, np.array(kp1), np.array(kp2)
 
-    return matches, p1, p2, list(kp1), list(kp2)
+def sift_detect_and_compute(img: np.ndarray, nfeatures=None):
+    sift = cv2.SIFT_create(nfeatures)
+    kp, des = sift.detectAndCompute(img, None)
+    ps = np.array([k.pt for k in kp])
+    return ps, np.array(kp), des
+
+def match_sift_desc(des1, des2, knn_k: int | None=None):
+    bf = cv2.BFMatcher()
+    if knn_k is not None:
+        matches = bf.knnMatch(des1, des2, k=knn_k)
+        matches = [[m] for m, n in matches if m.distance < .75 * n.distance]
+        arr = np.array([(m[0].queryIdx, m[0].trainIdx) for m in matches])
+    else:
+        matches = bf.match(des1, des2)
+        arr = np.array([(m.queryIdx, m.trainIdx) for m in matches])
+
+    return arr, matches
+        
 
 
 def RANSAC_8_point(p1s, p2s, sigma=3, itterations=100):
@@ -422,8 +506,18 @@ def RANSAC_8_point(p1s, p2s, sigma=3, itterations=100):
             _best_idx = inlier_idx
             _max = inlier_count
             print("New best estimate: ", _max)
-    
+
     return _max_F, _best_idx
+
+
+def load_image(path: str | Path, normalize=False, convert_flag=cv2.COLOR_BGR2GRAY):
+    if isinstance(path, Path):
+        path = path.as_posix()  # type: ignore
+    im = cv2.imread(path)
+    im = cv2.cvtColor(im, convert_flag)
+    if normalize:
+        im /= 255
+    return im
 
 
 def RANSAC(
@@ -492,7 +586,7 @@ def plot_homo_line(line: np.ndarray, points: np.ndarray, threshold: int, ax=None
 
 
 def gaussian1DKernel(sigma: float, epsilon: int | None = None):
-    h = epsilon or np.ceil(5 * sigma)
+    h = epsilon or np.ceil(4 * sigma)
     x = np.arange(-h, h + 1)
 
     g = np.exp(-(x**2) / (2 * sigma**2)) / np.sqrt(2 * np.pi * sigma**2)

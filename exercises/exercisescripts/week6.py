@@ -24,7 +24,7 @@ def test_ex1():
 
 
 def ex1():
-    return u.gaussian1DKernel(10)
+    return u.gaussian1DKernel(2)
 
 def test_ex2():
     I, Ix, Iy = ex2()
@@ -42,7 +42,7 @@ def test_ex2():
 def ex2():
     img = cv2.imread((img_path / "TestIm1.png").as_posix())
     img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-    return u.gaussianSmoothing(img, 10)
+    return u.gaussianSmoothing(img, 2)
     
 def test_ex3(): 
     C = ex3()
@@ -54,7 +54,7 @@ def test_ex3():
 
 def ex3():
     img = cv2.imread((img_path / "TestIm1.png").as_posix(), cv2.IMREAD_GRAYSCALE) 
-    h_img = u.smoothed_hessian(img, 10, 600)
+    h_img = u.smoothed_hessian(img, 2, 600)
     return h_img
 
 def test_ex4():
@@ -114,9 +114,9 @@ def ex6():
     return square_img, square_edges, weird_img, weird_edges
 
 if __name__ == "__main__":
-    # test_ex1()
-    # test_ex2()
-    # test_ex3()
-    # test_ex4()
-    # test_ex5()
+    test_ex1()
+    test_ex2()
+    test_ex3()
+    test_ex4()
+    test_ex5()
     test_ex6()

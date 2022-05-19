@@ -208,7 +208,7 @@ def ex8():
 
 if __name__ == "__main__":
     # test_ex1()
-    # test_ex2()
+    test_ex2()
     # test_ex3()
     # test_ex4()
     # test_ex5()

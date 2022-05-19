@@ -73,7 +73,7 @@ def test_ex8():
     for ax, img, q, dp  in zip(axs.flatten(), images, qs, detected_points):
         ax.imshow(img)
         ax.scatter(*q, s=10, c="red")
-        err = np.sqrt(np.mean((q- dp)**2))
+        err = np.sqrt(np.mean((q - dp)**2))
         ax.set_title(f"{err=:.2f}")
         ax.grid("off")
         ax.axis("off")

@@ -76,8 +76,49 @@ def ex3():
     _, Ftrue = u.generate_fundemental_matrix(k, k, Rtilde, ttilde)
     return Fest, Ftrue
 
+def test_ex4():
+
+    mb, ma = ex4()
+    
+    fig, [ax1, ax2] = plt.subplots(2, 1, figsize=(24, 24))
+    ax1.imshow(mb)
+    ax2.imshow(ma)
+
+    ax1.axis('off')
+    ax2.axis('off')
+    
+    ax1.set_title("Before constriant")
+    ax2.set_title("After constriant")
+    
+    plt.tight_layout()
+
+    S.save_fig("ex9-4")
+
+def ex4():
+    img1 = cv2.imread("../../data/sift_personal_images/setup1.jpg", cv2.IMREAD_GRAYSCALE)
+    img2 = cv2.imread("../../data/sift_personal_images/setup2.jpg", cv2.IMREAD_GRAYSCALE)
+    scale_percent = 40
+    width = int(img1.shape[0] * scale_percent/100)
+    height = int(img1.shape[0] * scale_percent / 100)
+    dim = (width, height)
+
+    img1 = cv2.resize(img1, dim, interpolation = cv2.INTER_AREA)
+    img2 = cv2.resize(img2, dim, interpolation = cv2.INTER_AREA)
+    
+    r_matches, p1s, p2s, kp1, kp2 = u.get_features_sift(img1, img2)
+    p1h = u.inhom_to_hom(p1s)
+    p2h = u.inhom_to_hom(p2s)
+
+    ransac_F, inlier_idx = u.RANSAC_8_point(p1h, p2h, sigma=3, itterations=1000)
+    ransac_F_matches = [r_matches[x] for x in inlier_idx] # type: ignore
+
+    match_before = cv2.drawMatches(img1, kp1, img2, kp2, r_matches, None, flags=cv2.DrawMatchesFlags_NOT_DRAW_SINGLE_POINTS)
+    match_after = cv2.drawMatches(img1, kp1, img2, kp2, ransac_F_matches, None, flags=cv2.DrawMatchesFlags_NOT_DRAW_SINGLE_POINTS)
+    
+    return match_before, match_after
 
 if __name__ == "__main__":
     # test_ex1()
     # test_ex2()
-    test_ex3()
+    # test_ex3()
+    test_ex4()
